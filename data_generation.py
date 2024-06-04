@@ -1,13 +1,5 @@
 import numpy as np
 
-"""
-Unlike the information bottleneck paper, (https://arxiv.org/abs/1703.00810)
-our data is more complicated.
-x is a 12-dimesnional standard Gaussian, and y is labeled by a random linear threshold function (halfspace)
-with random bias, with random labeling noise 0.1. 
-"""
-
-
 def generate_synthetic_data(num_samples):
     # Set the dimension of each sample
     dim = 12
@@ -26,7 +18,7 @@ def generate_synthetic_data(num_samples):
     Y = (LTF >= 0).astype(int)
 
     # Introduce noise: flip labels with a probability of 0.1
-    noise = np.random.rand(num_samples) < 0.05  # Boolean array where flips occur
+    noise = np.random.rand(num_samples) < 0.1  # Boolean array where flips occur
     Y[noise] = 1 - Y[noise]  # Flip the labels
 
     return X, Y
@@ -56,3 +48,6 @@ def generate_and_save_data(n_train=10000, n_test=1000):
     np.savetxt("X_test.txt", X_test)
     np.savetxt("Y_test.txt", Y_test)
     print("Finished saving the training and testing data. ")
+
+
+generate_and_save_data(5000, 500)

@@ -8,14 +8,16 @@ import numpy as np
 import matplotlib.pyplot as plt
 from torch.utils.data import TensorDataset, DataLoader
 
-
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+if torch.cuda.is_available():
+    device = torch.device('cuda')
+else:
+    device = torch.device('cpu')
 print("device: {}".format(device))
 
 # TODO: Change the following for experiment.
-algorithm = "Adam"
+algorithm = "SGD"
 
-def load_data():
+def load_training_data():
     X_train = np.loadtxt("X_train.txt")
     Y_train = np.loadtxt("Y_train.txt").astype(int)
     # Convert to tensors
@@ -23,21 +25,32 @@ def load_data():
     Y_train = torch.tensor(Y_train, dtype=torch.float32, device=device)  # Note the type change here for BCELoss
     return X_train, Y_train
 
+def load_testing_data():
+    X_test = np.loadtxt("X_test.txt")
+    Y_test = np.loadtxt("Y_test.txt").astype(int)
+    # Convert to tensors
+    X_test = torch.tensor(X_test, dtype=torch.float32, device=device)
+    Y_test = torch.tensor(Y_test, dtype=torch.float32, device=device)
+    return X_train, Y_train
+
 
 # Initialize the model, loss criterion, and optimizer
-model = FullyConnectedNN()
+model = FullyConnectedNN(device=device)
 criterion = nn.BCELoss()  # Binary Cross-Entropy Loss
 if algorithm == "SGD":
-    optimizer = optim.SGD(model.parameters(), lr=0.05)
+    optimizer = optim.SGD(model.parameters(), lr=0.01) # TODO: try 0.1 vs 0.01.
 elif algorithm == "Adagrad":
-    optimizer = optim.Adagrad(model.parameters(), lr=0.05)
+    optimizer = optim.Adagrad(model.parameters(), lr=0.01)
 elif algorithm == "SGD-M":
-    optimizer = optim.SGD(model.parameters(), lr=0.05, momentum=0.9)
+    optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
 elif algorithm == "Adam":
-    optimizer = optim.Adam(model.parameters(), lr=0.05, betas=(0.9, 0.999)) # is this a good parameter?
+    optimizer = optim.Adam(model.parameters(), lr=0.01, betas=(0.9, 0.999)) # is this a good parameter?
+elif algorithm == "RMSprop":
+    optimizer = optim.RMSprop(model.parameters(), lr=0.01, alpha=0.99)
 
 # Load training data
-X_train, Y_train = load_data()
+X_train, Y_train = load_training_data()
+X_test, Y_test = load_testing_data()
 
 # DataLoader setup
 from torch.utils.data import TensorDataset, DataLoader
@@ -46,23 +59,27 @@ dataset = TensorDataset(X_train, Y_train)
 train_loader = DataLoader(dataset, batch_size=100, shuffle=True)
 
 # Training the model
-num_epochs = 200
+num_epochs = 400
 losses = []
-accuracies = []
+train_accuracies = []
+test_accuracies = []
 # hessians = [] # One hessian per epoch, evaluated at the beginning of epoch.
 max_eigenvals = []
 log_R_med = [] # Log of the ratio max_eigenvalue / med_eigenvalue.
 
+print("start training")
 for epoch in range(num_epochs):
     epoch_losses = []
-    correct = 0
-    total = 0
+    train_correct = 0
+    train_total = 0
+    test_correct = 0
+    test_total = 0
     compute_hessian = True
 
     for inputs, labels in train_loader:
         optimizer.zero_grad()
-        outputs = model(inputs).squeeze()  # Ensure output is same shape as labels
-        loss = criterion(outputs, labels)
+        train_outputs = model(inputs).squeeze()  # Ensure output is same shape as labels
+        loss = criterion(train_outputs, labels)
 
         # Calculate Hessian at beginning of each epoch.
         if compute_hessian:
@@ -71,14 +88,13 @@ for epoch in range(num_epochs):
             first_derivative_flattened = torch.cat([grad.view(-1) for grad in first_derivative])
 
             # Compute the Hessian matrix
-            hessian = []
+            hessian = torch.zeros((0, first_derivative_flattened.shape[0]), device=device)
             for grad in first_derivative: # Each entry: grad on weight1, bias1, etc.
                 for g in grad.view(-1):  # Flatten the gradient
                     second_derivative = autograd.grad(g, model.parameters(), retain_graph=True, allow_unused=True)
-                    second_derivative_flattened = torch.cat([sd.view(-1) for sd in second_derivative if sd is not None]).numpy()
-                    hessian.append(second_derivative_flattened)
+                    second_derivative_flattened = torch.cat([sd.view(-1) for sd in second_derivative if sd is not None])
+                    hessian = torch.cat((hessian, torch.unsqueeze(second_derivative_flattened, dim=0)), dim=0)
 
-            hessian = torch.tensor(np.array(hessian))
             L = torch.linalg.eigvalsh(hessian)
             max_eigenvals.append(torch.max(L))
             log_R_med.append(torch.log(max_eigenvals[-1]) - torch.log(torch.median(L)))
@@ -90,47 +106,66 @@ for epoch in range(num_epochs):
         epoch_losses.append(loss.item())
 
         # Calculate accuracy manually
-        predicted = (outputs > 0.5).float()  # Convert probabilities to 0 or 1
-        total += labels.size(0)
-        correct += (predicted == labels).sum().item()
+        predicted = (train_outputs > 0.5).float()  # Convert probabilities to 0 or 1
+        train_total += labels.size(0)
+        train_correct += (predicted == labels).sum().item()
+
+        # Testing
+        test_outputs = model(X_test).squeeze()
+        predicted = (test_outputs > 0.5).float()
+        test_total += Y_test.size(0)
+        test_correct += (predicted == Y_test).sum().item()
 
     epoch_loss = sum(epoch_losses) / len(epoch_losses)
-    epoch_acc = 100 * correct / total
     losses.append(epoch_loss)
-    accuracies.append(epoch_acc)
+    train_accuracy = 100 * train_correct / train_total
+    train_accuracies.append(train_accuracy)
+    test_accuracy = 100 * test_correct / test_total
+    test_accuracies.append(test_accuracy)
 
-    print(f"Epoch {epoch + 1}/{num_epochs}, Loss: {epoch_loss:.4f}, Accuracy: {epoch_acc:.2f}%, Max ev: {max_eigenvals[-1]}, Log R_med: {log_R_med[-1]}")
+    print(f"Epoch {epoch + 1}/{num_epochs}, Loss: {epoch_loss:.4f}, Train accuracy: {train_accuracy:.2f}%, Test accuracy: {test_accuracy:.2f}%, Max ev: {max_eigenvals[-1]}, Log R_med: {log_R_med[-1]}")
 
 # Plotting
+x = [i for i in range(num_epochs)]
+
 plt.figure(figsize=(12, 12))
 plt.suptitle("Training using {}".format(algorithm))
 
 plt.subplot(2, 2, 1)
-plt.plot(losses, label='Loss')
+plt.plot(x, losses, label='Loss')
 plt.title('Loss vs. Epochs')
 plt.xlabel('Epochs')
 plt.ylabel('Loss')
 plt.legend()
 
 plt.subplot(2, 2, 2)
-plt.plot(accuracies, label='Accuracy')
+plt.plot(x, train_accuracies, label='Train accuracy')
+plt.plot(x, test_accuracies, label='Test accuracy')
 plt.title('Accuracy vs. Epochs')
 plt.xlabel('Epochs')
 plt.ylabel('Accuracy (%)')
 plt.legend()
 
 plt.subplot(2, 2, 3)
-plt.plot(max_eigenvals, label='Max eigenvalue')
+plt.plot(x, max_eigenvals, label='Max eigenvalue')
 plt.title('Max eigenvalue of Hessian vs. Epochs')
 plt.xlabel('Epochs')
 plt.ylabel('Max eigenvalue')
 plt.legend()
 
 plt.subplot(2, 2, 4)
-plt.plot(log_R_med, label='Log R_med')
+log_R_med = np.array([tensor.item() for tensor in log_R_med])
+plt.plot(x, log_R_med, label='Log R_med')
 plt.title('Log R_med vs. Epochs')
 plt.xlabel('Epochs')
 plt.ylabel('Log R_med')
+
+# Annotate infinity values with dots above the highest finite value
+max_finite_value = np.max(log_R_med[np.isfinite(log_R_med)])
+inf_y = max_finite_value + (max_finite_value * 0.1)  # Position slightly above the highest finite value
+for i in range(len(x)):
+    if np.isinf(log_R_med[i]):
+        plt.plot(i, inf_y, 'ro')
 plt.legend()
 
 plt.show()
