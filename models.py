@@ -16,25 +16,25 @@ class FullyConnectedNN(nn.Module):
         super(FullyConnectedNN, self).__init__()
 
         # Define the fully connected layers
-        self.fcs = nn.ModuleList()
-        for i in range(4):
-            if i == 0:
-                self.fcs.append(nn.Linear(in_features=12, out_features=64))
-            else:
-                self.fcs.append(nn.Linear(in_features=4**(4-i), out_features=4**(4-i-1)))
-        # self.fc1 = nn.Linear(in_features=12, out_features=64)  # Input layer
+        # self.fcs = nn.ModuleList()
+        # for i in range(4):
+        #     if i == 0:
+        #         self.fcs.append(nn.Linear(in_features=12, out_features=64))
+        #     else:
+        #         self.fcs.append(nn.Linear(in_features=4**(4-i), out_features=4**(4-i-1)))
+        self.fc1 = nn.Linear(in_features=12, out_features=64)  # Input layer
         # self.fc2 = nn.Linear(in_features=64, out_features=32)
         # self.fc3 = nn.Linear(in_features=32, out_features=16)
         # self.fc4 = nn.Linear(in_features=16, out_features=8)
         # self.fc5 = nn.Linear(in_features=8, out_features=4)
         # self.fc6 = nn.Linear(in_features=4, out_features=2)
-        # self.fc7 = nn.Linear(in_features=2, out_features=1) # Output layer
+        self.fc7 = nn.Linear(in_features=64, out_features=1) # Output layer
 
     def forward(self, x):
         # Pass the input through the layers with ReLU activation for hidden layers
-        for i in range(3):
-            x = F.relu(self.fcs[i](x))
-        # x = F.relu(self.fc1(x))
+        # for i in range(3):
+        #     x = F.relu(self.fcs[i](x))
+        x = F.relu(self.fc1(x))
         # x = F.relu(self.fc2(x))
         # x = F.relu(self.fc3(x))
         # x = F.relu(self.fc4(x))
@@ -42,15 +42,9 @@ class FullyConnectedNN(nn.Module):
         # x = F.relu(self.fc6(x))
 
         # Use sigmoid activation for the output layer
-        x = torch.sigmoid(self.fcs[3](x))
-        # x = torch.sigmoid(self.fc7(x))
+        # x = torch.sigmoid(self.fcs[3](x))
+        x = torch.sigmoid(self.fc7(x))
         return x
-
-    def get_first_two_grads(self, level: int):
-        if level < 0 or level >6:
-            raise ValueError("level must be integer in [0,6]")
-
-
 
 
 """Tests."""
