@@ -44,9 +44,9 @@ elif algorithm == "Adagrad":
 elif algorithm == "SGD-M":
     optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
 elif algorithm == "Adam":
-    optimizer = optim.Adam(model.parameters(), lr=0.01, betas=(0.9, 0.999)) # is this a good parameter?
-elif algorithm == "RMSprop":
-    optimizer = optim.RMSprop(model.parameters(), lr=0.01, alpha=0.99)
+    optimizer = optim.Adam(model.parameters(), lr=0.01, betas=(0.9, 0.999))
+elif algorithm == "Ada-no-m":
+    optimizer = optim.Adam(model.parameters(), lr=0.01, betas=(0, 0.999))
 
 # Load training data
 X_train, Y_train = load_training_data()
