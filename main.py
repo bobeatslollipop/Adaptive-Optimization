@@ -15,7 +15,7 @@ else:
 print("device: {}".format(device))
 
 # TODO: Change the following for experiment.
-algorithm = "SGD"
+algorithm = "RMSprop"
 
 def load_training_data():
     X_train = np.loadtxt("X_train.txt")
@@ -45,8 +45,9 @@ elif algorithm == "SGD-M":
     optimizer = optim.SGD(model.parameters(), lr=0.01, momentum=0.9)
 elif algorithm == "Adam":
     optimizer = optim.Adam(model.parameters(), lr=0.01, betas=(0.9, 0.999))
-elif algorithm == "Ada-no-m":
-    optimizer = optim.Adam(model.parameters(), lr=0.01, betas=(0, 0.999))
+elif algorithm == "RMSprop":
+    optimizer = optim.RMSprop(model.parameters(), lr=0.01, alpha=0.9)
+
 
 # Load training data
 X_train, Y_train = load_training_data()

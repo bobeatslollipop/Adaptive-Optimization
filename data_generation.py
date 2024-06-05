@@ -6,6 +6,8 @@ def generate_synthetic_data(num_samples):
 
     # Generate random weights and bias from a standard Gaussian distribution
     w = np.random.randn(dim)
+
+    # Removed bias to give 50% prior to both labels.
     b = np.random.randn()
 
     # Generate samples: each x is a 12-dimensional vector from a standard Gaussian
@@ -19,9 +21,11 @@ def generate_synthetic_data(num_samples):
 
     # Introduce noise: flip labels with a probability of 0.1
     noise = np.random.rand(num_samples) < 0.1  # Boolean array where flips occur
+    corrupt_percentage = 100 * (noise == True).sum() / num_samples
+    print("{}% of samples are flipped.".format(corrupt_percentage))
     Y[noise] = 1 - Y[noise]  # Flip the labels
 
-    return X, Y
+    return X, Y, w, b, corrupt_percentage
 
 
 """Tests."""
@@ -36,7 +40,7 @@ def generate_synthetic_data(num_samples):
 
 def generate_and_save_data(n_train=10000, n_test=1000):
     num_samples = n_train + n_test
-    X, Y = generate_synthetic_data(num_samples)
+    X, Y, w, b, corrupt_percentage = generate_synthetic_data(num_samples)
 
     # Split the data into training and testing sets
     X_train, Y_train = X[:n_train], Y[:n_train]
@@ -47,7 +51,10 @@ def generate_and_save_data(n_train=10000, n_test=1000):
     np.savetxt("Y_train.txt", Y_train)
     np.savetxt("X_test.txt", X_test)
     np.savetxt("Y_test.txt", Y_test)
+    np.savetxt("ground_truth_w.txt", w)
+    np.savetxt("ground_truth_b.txt", np.array([b]))
+    np.savetxt("corrupted_percentage.txt", np.array([corrupt_percentage]))
     print("Finished saving the training and testing data. ")
 
 
-generate_and_save_data(5000, 500)
+generate_and_save_data(5000, 1000)
