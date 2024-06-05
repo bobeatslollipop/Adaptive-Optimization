@@ -16,7 +16,7 @@ device = torch.device('cpu')
 print("device: {}".format(device))
 
 # TODO: Change the following for experiment.
-algorithm = "RMSprop"
+algorithm = "Adam"
 
 def load_training_data():
     X_train = np.loadtxt("X_train.txt")
@@ -53,6 +53,13 @@ elif algorithm == "RMSprop":
 # Load training data
 X_train, Y_train = load_training_data()
 X_test, Y_test = load_testing_data()
+
+w = np.loadtxt("ground_truth_w.txt")
+b = np.loadtxt("ground_truth_b.txt")
+ground_truth_output = (X_test.numpy().dot(w) + b >= 0).astype(float)
+ground_truth_correct = (ground_truth_output == Y_test.numpy()).sum()
+ground_truth_accuracy = 100 * ground_truth_correct / Y_test.size(0)
+print("Ground truth accuracy: {}".format(ground_truth_accuracy))
 
 # DataLoader setup
 from torch.utils.data import TensorDataset, DataLoader
@@ -143,6 +150,7 @@ plt.legend()
 plt.subplot(2, 2, 2)
 plt.plot(x, train_accuracies, label='Train accuracy')
 plt.plot(x, test_accuracies, label='Test accuracy')
+plt.axhline(y=ground_truth_accuracy, color='g', linestyle='--', label='Ground_truth') # why is it sometimes better than  ground truth?
 plt.title('Accuracy vs. Epochs')
 plt.xlabel('Epochs')
 plt.ylabel('Accuracy (%)')
@@ -171,3 +179,4 @@ for i in range(len(x)):
 plt.legend()
 
 plt.show()
+
